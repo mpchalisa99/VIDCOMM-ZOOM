@@ -26,68 +26,84 @@ export default defineConfig(({ command }) => {
       },
       react(),
       tailwindcss(),
-      ...(command === 'build'
-        ? [
-            VitePWA({
-              registerType: 'autoUpdate',
-              includeAssets: [
-                'favicon.ico',
-                'favicon.png',
-                'apple-touch-icon.png',
-                'pwa-192x192.png',
-                'pwa-512x512.png',
-                'icons/icon-192x192.png',
-                'icons/icon-512x512.png',
-                'assets/aistudio/1794622160588_bf320b0e-picsay__1__166e4b0f.png',
-                'assets/aistudio/1795761235586_bbd00e2e.jpg',
-                'assets/aistudio/1792503945296_954409ac.jpg',
-              ],
-              manifest: {
-                id: '/',
-                name: 'TACTICAL VIDCOMM DISKOMLEKAU',
-                short_name: 'VIDCOMM',
-                description:
-                  'Tactical Video Teleconference (VTC) Command & Platoon Communication System DISKOMLEKAU.',
-                theme_color: '#0f172a',
-                background_color: '#0f172a',
-                display: 'standalone',
-                orientation: 'any',
-                start_url: '/',
-                scope: '/',
-                icons: [
-                  {
-                    src: '/icons/icon-192x192.png',
-                    sizes: '192x192',
-                    type: 'image/png',
-                    purpose: 'any maskable',
-                  },
-                  {
-                    src: '/icons/icon-512x512.png',
-                    sizes: '512x512',
-                    type: 'image/png',
-                    purpose: 'any maskable',
-                  },
-                  {
-                    src: '/pwa-192x192.png',
-                    sizes: '192x192',
-                    type: 'image/png',
-                    purpose: 'any maskable',
-                  },
-                  {
-                    src: '/pwa-512x512.png',
-                    sizes: '512x512',
-                    type: 'image/png',
-                    purpose: 'any maskable',
-                  },
-                ],
-              },
-              workbox: {
-                globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-                navigateFallbackDenylist: [/^\/api\//],
-              },
-            }),
-          ]
-        : []),
+      VitePWA({
+        registerType: 'autoUpdate',
+        injectRegister: 'auto',
+        includeAssets: [
+          'favicon.ico',
+          'favicon.png',
+          'apple-touch-icon.png',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'pwa-maskable-192x192.png',
+          'pwa-maskable-512x512.png',
+          'icons/icon-192x192.png',
+          'icons/icon-512x512.png',
+          'assets/aistudio/1794622160588_bf320b0e-picsay__1__166e4b0f.png',
+          'assets/aistudio/1795761235586_bbd00e2e.jpg',
+          'assets/aistudio/1792503945296_954409ac.jpg',
+        ],
+        manifest: {
+          id: '/',
+          name: 'TACTICAL VIDCOMM DISKOMLEKAU',
+          short_name: 'VIDCOMM',
+          description:
+            'Tactical Video Teleconference (VTC) Command & Platoon Communication System DISKOMLEKAU.',
+          theme_color: '#0f172a',
+          background_color: '#0f172a',
+          display: 'standalone',
+          orientation: 'any',
+          start_url: '/',
+          scope: '/',
+          categories: ['utilities', 'productivity', 'communications'],
+          icons: [
+            {
+              src: '/pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/icons/icon-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/icons/icon-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/pwa-maskable-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+            {
+              src: '/pwa-maskable-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          navigateFallbackDenylist: [/^\/api\//],
+        },
+        devOptions: {
+          enabled: true,
+          type: 'module',
+        },
+      }),
     ],
     resolve: {
       alias: {

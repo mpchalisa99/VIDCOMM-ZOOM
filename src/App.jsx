@@ -354,10 +354,22 @@ function usePWAInstall() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true;
-    setIsInstalled(isStandalone);
+    const checkStandalone = () => {
+      const isStandaloneMedia = window.matchMedia('(display-mode: standalone)').matches;
+      const isIOSStandalone = window.navigator.standalone === true;
+      const isAndroidApp = document.referrer.includes('android-app://');
+      return isStandaloneMedia || isIOSStandalone || isAndroidApp;
+    };
+
+    setIsInstalled(checkStandalone());
+
+    const mql = window.matchMedia('(display-mode: standalone)');
+    const handleMql = (e) => setIsInstalled(e.matches || checkStandalone());
+    try {
+      mql.addEventListener('change', handleMql);
+    } catch {
+      mql.addListener?.(handleMql);
+    }
 
     const ua = window.navigator.userAgent.toLowerCase();
     setIsIOS(/iphone|ipad|ipod/.test(ua));
@@ -376,6 +388,11 @@ function usePWAInstall() {
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      try {
+        mql.removeEventListener('change', handleMql);
+      } catch {
+        mql.removeListener?.(handleMql);
+      }
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
@@ -383,12 +400,16 @@ function usePWAInstall() {
 
   const triggerInstall = async () => {
     if (!deferredPrompt) return false;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-      return true;
+    try {
+      await deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        setIsInstalled(true);
+        setDeferredPrompt(null);
+        return true;
+      }
+    } catch (err) {
+      console.warn('[PWA] Error launching install prompt:', err);
     }
     return false;
   };
@@ -409,7 +430,10 @@ function PWAInstallButton({ compact = false }) {
 
   const handleClick = async () => {
     if (isInstallable) {
-      await triggerInstall();
+      const accepted = await triggerInstall();
+      if (!accepted) {
+        setShowGuideModal(true);
+      }
     } else {
       setShowGuideModal(true);
     }
@@ -420,27 +444,35 @@ function PWAInstallButton({ compact = false }) {
       <button
         type="button"
         onClick={handleClick}
-        className={`rounded-lg bg-cyan-400/20 hover:bg-cyan-400/30 border border-cyan-300/60 text-cyan-200 font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
-          compact ? 'px-2 py-1 text-[10px] sm:text-xs' : 'px-3 py-1.5 text-xs'
+        className={`rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/60 text-sky-200 font-bold tracking-wider uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-[0_0_12px_rgba(56,189,248,0.2)] ${
+          compact ? 'px-2 py-1 text-[10px] sm:text-xs' : 'px-2.5 sm:px-3 py-1.5 text-xs'
         }`}
-        title="Install TACTICAL VIDCOMM ke Layar Utama HP"
+        title="Install TACTICAL VIDCOMM (APK Standalone) ke Layar HP"
       >
-        <Download className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
-        <span className="hidden sm:inline">{compact ? 'INSTALL' : 'INSTALL PWA'}</span>
+        <img
+          src="/pwa-192x192.png"
+          alt="Icon VIDCOMM"
+          className="w-4 h-4 rounded-full object-cover shrink-0"
+        />
+        <span>{compact ? 'APK' : 'PASANG APK'}</span>
       </button>
 
       {showGuideModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-slate-900 border border-sky-300/50 rounded-2xl p-5 shadow-[0_0_40px_rgba(56,189,248,0.25)] text-left space-y-3.5">
             <div className="flex items-center justify-between border-b border-sky-300/25 pb-2.5">
-              <div className="flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-cyan-300" />
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/pwa-192x192.png"
+                  alt="VIDCOMM Icon"
+                  className="w-10 h-10 rounded-xl shadow-md border border-sky-400/50 shrink-0"
+                />
                 <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-sky-300 uppercase">
-                    INSTALL VIDCOMM KE LAYAR HP
+                  <h3 className="text-xs sm:text-sm font-bold text-sky-300 uppercase leading-snug">
+                    PASANG VIDCOMM KE LAYAR HP
                   </h3>
-                  <p className="text-[10px] text-cyan-300">
-                    MODE STANDALONE FULLSCREEN
+                  <p className="text-[10px] text-cyan-300 font-semibold tracking-wider">
+                    APK STANDALONE FULLSCREEN
                   </p>
                 </div>
               </div>
@@ -453,22 +485,41 @@ function PWAInstallButton({ compact = false }) {
               </button>
             </div>
 
+            {isInstallable && (
+              <button
+                type="button"
+                onClick={async () => {
+                  await triggerInstall();
+                  setShowGuideModal(false);
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(56,189,248,0.4)] cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>PASANG APK SEKARANG (OTOMATIS)</span>
+              </button>
+            )}
+
             {isIOS ? (
               <div className="space-y-2 text-xs text-sky-100 leading-relaxed">
-                <p className="font-bold text-cyan-300">Panduan iPhone / iPad (Safari):</p>
-                <ol className="list-decimal list-inside space-y-1.5 text-slate-300">
-                  <li>Ketuk ikon <strong>Share (Bagikan)</strong> di Safari.</li>
-                  <li>Pilih <strong>&quot;Add to Home Screen&quot;</strong>.</li>
-                  <li>Ketuk <strong>Add (Tambah)</strong> di pojok kanan atas.</li>
+                <p className="font-bold text-cyan-300 flex items-center gap-1.5">
+                  <Smartphone className="w-4 h-4" /> Panduan iPhone / iPad (Safari):
+                </p>
+                <ol className="list-decimal list-inside space-y-1.5 text-slate-300 text-[11px]">
+                  <li>Ketuk ikon <strong>Bagikan (Share)</strong> di bilah bawah Safari.</li>
+                  <li>Gulir ke bawah lalu pilih <strong>&quot;Tambahkan ke Layar Utama&quot; (Add to Home Screen)</strong>.</li>
+                  <li>Ketuk <strong>Tambah (Add)</strong> di pojok kanan atas. Ikon VIDCOMM akan terpasang di layar iPhone.</li>
                 </ol>
               </div>
             ) : (
               <div className="space-y-2 text-xs text-sky-100 leading-relaxed">
-                <p className="font-bold text-cyan-300">Panduan Android (Chrome / Edge):</p>
-                <ol className="list-decimal list-inside space-y-1.5 text-slate-300">
-                  <li>Buka URL aplikasi ini di tab utama <strong>Google Chrome</strong>.</li>
-                  <li>Ketuk ikon menu <strong>Titik Tiga (⋮)</strong> di pojok kanan atas.</li>
-                  <li>Pilih <strong>&quot;Install App&quot; / &quot;Tambahkan ke Layar Utama&quot;</strong>.</li>
+                <p className="font-bold text-cyan-300 flex items-center gap-1.5">
+                  <Smartphone className="w-4 h-4" /> Panduan Android (Chrome / Edge / Vercel):
+                </p>
+                <ol className="list-decimal list-inside space-y-1.5 text-slate-300 text-[11px]">
+                  <li>Buka link aplikasi di tab utama <strong>Google Chrome</strong> (bukan di dalam browser WhatsApp).</li>
+                  <li>Ketuk tombol menu <strong>Titik Tiga (⋮)</strong> di pojok kanan atas Chrome.</li>
+                  <li>Pilih <strong>&quot;Instal aplikasi&quot;</strong> atau <strong>&quot;Tambahkan ke Layar Utama&quot;</strong>.</li>
+                  <li>Konfirmasi <strong>&quot;Instal&quot;</strong>. Android akan mengunduh WebAPK dan ikon <strong>VIDCOMM</strong> akan langsung muncul di daftar aplikasi HP Anda!</li>
                 </ol>
               </div>
             )}
@@ -476,9 +527,130 @@ function PWAInstallButton({ compact = false }) {
             <button
               type="button"
               onClick={() => setShowGuideModal(false)}
-              className="w-full py-2.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-xs tracking-wider uppercase cursor-pointer"
+              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-200 font-bold text-xs tracking-wider uppercase border border-sky-300/30 cursor-pointer"
             >
-              MENGERTI
+              TUTUP
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function PWAInstallBanner() {
+  const { isInstallable, isInstalled, isIOS, triggerInstall } = usePWAInstall();
+  const [showGuide, setShowGuide] = useState(false);
+
+  if (isInstalled) return null;
+
+  return (
+    <>
+      <div className="mt-3.5 p-3 rounded-xl bg-gradient-to-r from-blue-950 via-slate-900 to-blue-950 border border-cyan-400/40 shadow-[0_0_20px_rgba(56,189,248,0.15)] flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <img
+            src="/pwa-192x192.png"
+            alt="VIDCOMM Icon"
+            className="w-9 h-9 rounded-xl shadow border border-sky-400/50 shrink-0"
+          />
+          <div className="min-w-0">
+            <h4 className="text-xs font-bold text-sky-200 uppercase truncate">
+              PASANG APLIKASI VIDCOMM
+            </h4>
+            <p className="text-[10px] text-cyan-300/80 truncate">
+              Akses cepat layar penuh tanpa browser
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={async () => {
+            if (isInstallable) {
+              const ok = await triggerInstall();
+              if (!ok) setShowGuide(true);
+            } else {
+              setShowGuide(true);
+            }
+          }}
+          className="px-3 py-1.5 rounded-lg bg-sky-400 hover:bg-sky-300 text-slate-950 text-xs font-bold uppercase tracking-wider shrink-0 transition-colors cursor-pointer shadow-[0_0_10px_rgba(56,189,248,0.3)]"
+        >
+          PASANG APK
+        </button>
+      </div>
+
+      {showGuide && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-sky-300/50 rounded-2xl p-5 shadow-[0_0_40px_rgba(56,189,248,0.25)] text-left space-y-3.5">
+            <div className="flex items-center justify-between border-b border-sky-300/25 pb-2.5">
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/pwa-192x192.png"
+                  alt="VIDCOMM Icon"
+                  className="w-10 h-10 rounded-xl shadow-md border border-sky-400/50 shrink-0"
+                />
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-sky-300 uppercase leading-snug">
+                    PASANG VIDCOMM KE LAYAR HP
+                  </h3>
+                  <p className="text-[10px] text-cyan-300 font-semibold tracking-wider">
+                    APK STANDALONE FULLSCREEN
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGuide(false)}
+                className="p-1 rounded-lg bg-blue-950 border border-sky-300/30 text-sky-300 hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {isInstallable && (
+              <button
+                type="button"
+                onClick={async () => {
+                  await triggerInstall();
+                  setShowGuide(false);
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-xs tracking-wider uppercase flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(56,189,248,0.4)] cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>PASANG APK SEKARANG (OTOMATIS)</span>
+              </button>
+            )}
+
+            {isIOS ? (
+              <div className="space-y-2 text-xs text-sky-100 leading-relaxed">
+                <p className="font-bold text-cyan-300 flex items-center gap-1.5">
+                  <Smartphone className="w-4 h-4" /> Panduan iPhone / iPad (Safari):
+                </p>
+                <ol className="list-decimal list-inside space-y-1.5 text-slate-300 text-[11px]">
+                  <li>Ketuk ikon <strong>Bagikan (Share)</strong> di bilah bawah Safari.</li>
+                  <li>Pilih <strong>&quot;Tambahkan ke Layar Utama&quot; (Add to Home Screen)</strong>.</li>
+                  <li>Ketuk <strong>Tambah (Add)</strong> di pojok kanan atas.</li>
+                </ol>
+              </div>
+            ) : (
+              <div className="space-y-2 text-xs text-sky-100 leading-relaxed">
+                <p className="font-bold text-cyan-300 flex items-center gap-1.5">
+                  <Smartphone className="w-4 h-4" /> Panduan Android (Chrome / Edge / Vercel):
+                </p>
+                <ol className="list-decimal list-inside space-y-1.5 text-slate-300 text-[11px]">
+                  <li>Buka link aplikasi di tab utama <strong>Google Chrome</strong> (bukan di dalam browser WhatsApp).</li>
+                  <li>Ketuk tombol menu <strong>Titik Tiga (⋮)</strong> di pojok kanan atas Chrome.</li>
+                  <li>Pilih <strong>&quot;Instal aplikasi&quot;</strong> atau <strong>&quot;Tambahkan ke Layar Utama&quot;</strong>.</li>
+                  <li>Konfirmasi <strong>&quot;Instal&quot;</strong>. Android akan mengunduh WebAPK dan ikon <strong>VIDCOMM</strong> akan langsung muncul di daftar aplikasi HP Anda!</li>
+                </ol>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowGuide(false)}
+              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-200 font-bold text-xs tracking-wider uppercase border border-sky-300/30 cursor-pointer"
+            >
+              TUTUP
             </button>
           </div>
         </div>
